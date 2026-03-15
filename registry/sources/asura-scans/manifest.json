@@ -1,0 +1,19 @@
+{
+  "id": "asura-scans",
+  "name": "Asura Scans",
+  "version": "0.1.0",
+  "lang": "en",
+  "base_urls": ["https://asuracomic.net"],
+  "content_type": "manhwa",
+  "supports_nsfw": false,
+  "module_filename": "asura_scans.wasm",
+  "module_sha256": "ded1743a19c614099e3c878f548746d3889b4a9a3dedac81bd21356a872bde3b",
+  "min_runtime_version": "0.1.0",
+  "capabilities": ["network_fetch", "log_debug"],
+  "allowed_domains": ["asuracomic.net", "gg.asuracomic.net"],
+  "author": "Atlas Contributors",
+  "license": "MIT OR Apache-2.0",
+  "tags": ["manhwa", "popular"],
+  "deprecated": false,
+  "description": "Asura Scans — popular manhwa/manga reader"
+}

@@ -1,0 +1,31 @@
+[package]
+name        = "atlas-runtime"
+description = "Atlas source platform — host-side WASM runtime bridge"
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+
+[lib]
+# Also builds as a C-compatible static library for Swift/FFI integration on iOS.
+crate-type = ["lib", "staticlib"]
+
+[dependencies]
+atlas-spec  = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+rmp-serde   = { workspace = true }
+thiserror   = { workspace = true }
+
+# Pure-Rust WASM interpreter.
+# Chosen over wasmtime because wasmtime requires JIT/Cranelift which is
+# incompatible with iOS W^X memory restrictions. wasmi is a pure interpreter.
+wasmi = { workspace = true }
+
+# SHA-256 for module integrity verification.
+sha2 = { workspace = true }
+
+# Synchronous HTTP for desktop/CLI use. On iOS, a NetworkProvider is injected
+# via the callback mechanism instead.
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+ureq = { workspace = true }

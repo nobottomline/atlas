@@ -1,0 +1,22 @@
+[package]
+name        = "example-source"
+description = "Atlas example source — demonstrates the SDK usage pattern"
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+atlas-sdk  = { workspace = true }
+atlas-spec = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[profile.release]
+opt-level = "z"   # Minimize WASM binary size
+lto       = true
+strip     = true
+codegen-units = 1

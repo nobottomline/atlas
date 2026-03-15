@@ -1,0 +1,30 @@
+# Rust
+/target
+**/.cargo-lock
+
+# WASM artifacts — keep registry binaries, ignore build output
+*.wasm
+!registry/**/*.wasm
+
+# iOS
+DerivedData/
+*.xcodeproj/xcuserdata
+*.xcworkspace/xcuserdata
+.build/
+Pods/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets
+.env
+*.pem
+*.key

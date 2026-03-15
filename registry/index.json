@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "updated_at": "2026-03-15T00:00:00Z",
+  "sources": [
+    {
+      "id": "asura-scans",
+      "name": "Asura Scans",
+      "latest_version": "0.1.0",
+      "lang": "en",
+      "manifest_url": "sources/asura-scans/manifest.json",
+      "icon_url": "sources/asura-scans/icon.png",
+      "description": "Asura Scans — popular manhwa/manga reader",
+      "tags": ["manhwa", "popular"],
+      "deprecated": false
+    },
+    {
+      "id": "example-source",
+      "name": "Example Source",
+      "latest_version": "0.1.0",
+      "lang": "en",
+      "manifest_url": "sources/example-source/manifest.json",
+      "icon_url": "sources/example-source/icon.png",
+      "description": "A minimal Atlas source for SDK demonstration.",
+      "tags": ["example", "demo"],
+      "deprecated": false
+    }
+  ]
+}

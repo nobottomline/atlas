@@ -1,0 +1,22 @@
+[package]
+name        = "atlas-cli"
+description = "Atlas source platform — developer CLI"
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+
+[[bin]]
+name = "atlas"
+path = "src/main.rs"
+
+[dependencies]
+atlas-spec    = { workspace = true }
+atlas-runtime = { workspace = true }
+clap          = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+rmp-serde     = { workspace = true }
+thiserror     = { workspace = true }
+anyhow        = { workspace = true }
+sha2          = { workspace = true }

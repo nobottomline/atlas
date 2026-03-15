@@ -1,0 +1,16 @@
+[package]
+name        = "atlas-spec"
+description = "Atlas source platform — core types, contracts, and manifest definitions"
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+
+# Must compile for both native (CLI, runtime) and wasm32-unknown-unknown (source modules).
+# Zero OS-level dependencies.
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde  = { workspace = true }
+thiserror  = { workspace = true }

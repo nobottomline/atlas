@@ -1,0 +1,19 @@
+{
+  "id": "example-source",
+  "name": "Example Source",
+  "version": "0.1.0",
+  "lang": "en",
+  "base_urls": ["https://example.com"],
+  "content_type": "manga",
+  "supports_nsfw": false,
+  "module_filename": "example_source.wasm",
+  "module_sha256": "3bfcdd985233a7dd85ba696bea3d674dd71e88d7971a77ba51cb54da16b72598",
+  "min_runtime_version": "0.1.0",
+  "capabilities": ["network_fetch", "log_debug"],
+  "allowed_domains": ["example.com"],
+  "author": "Atlas Contributors",
+  "license": "MIT OR Apache-2.0",
+  "tags": ["example", "demo"],
+  "deprecated": false,
+  "description": "A minimal Atlas source for SDK demonstration."
+}
