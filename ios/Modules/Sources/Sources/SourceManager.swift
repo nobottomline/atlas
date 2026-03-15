@@ -14,10 +14,17 @@ public final class SourceManager: @unchecked Sendable {
         case updateAvailable(newVersion: String)
     }
 
-    public struct InstalledSource: Identifiable, Sendable {
+    public struct InstalledSource: Identifiable, Hashable, Sendable {
         public let id: String
         public let manifest: SourceManifest
         public let instance: SourceInstance
+
+        public static func == (lhs: InstalledSource, rhs: InstalledSource) -> Bool {
+            lhs.id == rhs.id
+        }
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
     }
 
     // MARK: - State

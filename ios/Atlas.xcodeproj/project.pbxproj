@@ -17,6 +17,7 @@
 		0ED25A3FAE4A930752DED37B /* SourceManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E128BE84B3C622CF3695D0BE /* SourceManifest.swift */; };
 		14A0F99771A54FA4817483BA /* Settings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B33807A0FC000801CED00708 /* Settings.framework */; };
 		15FB64079ABD9E29CBCA4A3F /* WasmParser.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1B5D2C1E36BA280BB1EE3944 /* WasmParser.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		16FB2B0877EE079ECCD2ED33 /* Reader.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC6C3CAAAB2CE5CCC396E4A1 /* Reader.framework */; };
 		17AB2A9B8C552CC9B85F7A09 /* CapabilityPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 502F2482BF88701A3C26A677 /* CapabilityPolicy.swift */; };
 		17F7E925AAE24BA1C6DB6C46 /* Library.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 07F7101481A48F20D67EA23E /* Library.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1A540F7A1B63C95C15F3BC8F /* HostFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A226DFFDAFA14A25E16673 /* HostFunctions.swift */; };
@@ -138,6 +139,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 15BE2F8A01597C839FFC782A;
 			remoteInfo = Core;
+		};
+		38A2D18A4B99D90B7C7AC85A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 43D55555CA7BCC7C87E44A39 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A5FB404B7154846ADBE25AFB;
+			remoteInfo = Reader;
 		};
 		466AB5FD9B87A41E3DC74528 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -854,6 +862,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EDF6BF4506DCB739C159621E /* Core.framework in Frameworks */,
+				16FB2B0877EE079ECCD2ED33 /* Reader.framework in Frameworks */,
 				A5C7316DA9F225D55309767E /* SourceRegistry.framework in Frameworks */,
 				502D2E0458843DD02BD004A3 /* SourceRuntime.framework in Frameworks */,
 			);
@@ -1562,6 +1571,7 @@
 			);
 			dependencies = (
 				0D01FF2B2D2CC3E7A69F5D2F /* PBXTargetDependency */,
+				8A8E3E0B34702EEBB1DCAB18 /* PBXTargetDependency */,
 				E0D2DD950F5E4A84F31DA175 /* PBXTargetDependency */,
 				972B8B282F3DA82DF1912271 /* PBXTargetDependency */,
 			);
@@ -2285,6 +2295,12 @@
 			name = Core;
 			target = 15BE2F8A01597C839FFC782A /* Core */;
 			targetProxy = 74C5BAA6107F75D0E7642A9C /* PBXContainerItemProxy */;
+		};
+		8A8E3E0B34702EEBB1DCAB18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Reader;
+			target = A5FB404B7154846ADBE25AFB /* Reader */;
+			targetProxy = 38A2D18A4B99D90B7C7AC85A /* PBXContainerItemProxy */;
 		};
 		96DD6307A4F0D8A873FC974E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

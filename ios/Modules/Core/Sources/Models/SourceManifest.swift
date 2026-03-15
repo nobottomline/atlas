@@ -1,7 +1,7 @@
 import Foundation
 
 /// Swift mirror of `atlas_spec::manifest::SourceManifest`.
-public struct SourceManifest: Identifiable, Codable, Sendable {
+public struct SourceManifest: Identifiable, Codable, Sendable, Hashable {
     public let id: String
     public var name: String
     public var version: String

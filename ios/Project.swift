@@ -102,6 +102,7 @@ let sourcesTargets = module(
         .target(name: "SourceRuntime"),
         .target(name: "SourceRegistry"),
         .target(name: "Core"),
+        .target(name: "Reader"),
     ]
 )
 

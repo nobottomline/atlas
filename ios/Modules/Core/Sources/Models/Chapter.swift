@@ -1,7 +1,7 @@
 import Foundation
 
 /// Swift mirror of `atlas_spec::types::chapter::Chapter`.
-public struct Chapter: Identifiable, Codable, Sendable {
+public struct Chapter: Identifiable, Codable, Sendable, Hashable {
     public let id: String
     public var mangaId: String
     public var title: String?
