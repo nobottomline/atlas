@@ -84,13 +84,13 @@ final class HostFunctions: @unchecked Sendable {
         let url: String
         let method: String
         let headers: [String: String]
-        let body: [UInt8]?
+        let body: String?  // base64-encoded
     }
 
     private struct FetchResponseWire: Encodable {
         let status: UInt16
         let headers: [String: String]
-        let body: [UInt8]
+        let body: String  // base64-encoded
     }
 
     /// JSON envelope matching Rust AtlasResult<T>
@@ -145,8 +145,8 @@ final class HostFunctions: @unchecked Sendable {
         for (key, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
-        if let body = request.body {
-            urlRequest.httpBody = Data(body)
+        if let bodyB64 = request.body, let bodyData = Data(base64Encoded: bodyB64) {
+            urlRequest.httpBody = bodyData
         }
         urlRequest.timeoutInterval = 30
 
@@ -180,7 +180,7 @@ final class HostFunctions: @unchecked Sendable {
         let response = FetchResponseWire(
             status: status,
             headers: headers,
-            body: Array(responseData ?? Data())
+            body: (responseData ?? Data()).base64EncodedString()
         )
         return writeJsonOk(caller: caller, value: response)
     }
