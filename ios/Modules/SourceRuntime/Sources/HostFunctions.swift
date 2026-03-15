@@ -1,9 +1,11 @@
 // Atlas Platform
 import Foundation
 @preconcurrency import WasmKit
-import MessagePack
 
 /// Implements all Atlas host-import functions for the WasmKit runtime.
+///
+/// Host functions use JSON wire format for cross-language compatibility.
+/// (Swift JSONEncoder/JSONDecoder ↔ Rust serde_json)
 final class HostFunctions: @unchecked Sendable {
 
     let policy: CapabilityPolicy
@@ -11,6 +13,8 @@ final class HostFunctions: @unchecked Sendable {
     private var logBuffer: [String] = []
     private var cache: [String: (data: Data, expiry: Date?)] = [:]
     private let session: URLSession
+    private let jsonEncoder = JSONEncoder()
+    private let jsonDecoder = JSONDecoder()
 
     init(policy: CapabilityPolicy, store: Store, session: URLSession = .shared) {
         self.policy = policy
@@ -18,9 +22,7 @@ final class HostFunctions: @unchecked Sendable {
         self.session = session
     }
 
-    /// Register all host functions into a WasmKit `Imports` table.
     func register(into imports: inout Imports) {
-        // network.fetch(ptr: i32, len: i32) -> i64
         imports.define(
             module: "atlas", name: "host_network_fetch",
             Function(store: store, parameters: [.i32, .i32], results: [.i64]) {
@@ -29,8 +31,6 @@ final class HostFunctions: @unchecked Sendable {
                 return [.i64(self.hostNetworkFetch(caller: caller, args: args))]
             }
         )
-
-        // log.debug(ptr: i32, len: i32)
         imports.define(
             module: "atlas", name: "host_log_debug",
             Function(store: store, parameters: [.i32, .i32]) {
@@ -39,8 +39,6 @@ final class HostFunctions: @unchecked Sendable {
                 return []
             }
         )
-
-        // time.now() -> i64
         imports.define(
             module: "atlas", name: "host_time_now",
             Function(store: store, parameters: [], results: [.i64]) {
@@ -49,8 +47,6 @@ final class HostFunctions: @unchecked Sendable {
                 return [.i64(UInt64(Date().timeIntervalSince1970))]
             }
         )
-
-        // cache.get(ptr: i32, len: i32) -> i64
         imports.define(
             module: "atlas", name: "host_cache_get",
             Function(store: store, parameters: [.i32, .i32], results: [.i64]) {
@@ -59,8 +55,6 @@ final class HostFunctions: @unchecked Sendable {
                 return [.i64(self.hostCacheGet(caller: caller, args: args))]
             }
         )
-
-        // cache.set(ptr: i32, len: i32) -> i32
         imports.define(
             module: "atlas", name: "host_cache_set",
             Function(store: store, parameters: [.i32, .i32], results: [.i32]) {
@@ -69,8 +63,6 @@ final class HostFunctions: @unchecked Sendable {
                 return [.i32(self.hostCacheSet(caller: caller, args: args))]
             }
         )
-
-        // preferences.get(ptr: i32, len: i32) -> i64
         imports.define(
             module: "atlas", name: "host_preferences_get",
             Function(store: store, parameters: [.i32, .i32], results: [.i64]) {
@@ -92,18 +84,42 @@ final class HostFunctions: @unchecked Sendable {
         let url: String
         let method: String
         let headers: [String: String]
-        let body: Data?
+        let body: [UInt8]?
     }
 
     private struct FetchResponseWire: Encodable {
         let status: UInt16
         let headers: [String: String]
-        let body: Data
+        let body: [UInt8]
+    }
+
+    /// JSON envelope matching Rust AtlasResult<T>
+    private struct OkEnvelope<T: Encodable>: Encodable {
+        let status: String
+        let data: T
+    }
+
+    private struct ErrEnvelope: Encodable {
+        let status: String
+        let data: ErrData
+    }
+
+    private struct ErrData: Encodable {
+        let RuntimeFailure: MessageField // swiftlint:disable:this identifier_name
+    }
+
+    private struct MessageField: Encodable {
+        let message: String
+    }
+
+    private struct NilEnvelope: Encodable {
+        let status: String
+        let data: String?
     }
 
     private func hostNetworkFetch(caller: Caller, args: [Value]) -> UInt64 {
         guard (try? policy.require("network.fetch")) != nil else {
-            return writeError(caller: caller, message: "capability denied: network.fetch")
+            return writeJsonError(caller: caller, message: "capability denied: network.fetch")
         }
 
         let ptr = Int(args[0].i32)
@@ -112,15 +128,18 @@ final class HostFunctions: @unchecked Sendable {
         guard let memory = caller.instance?.exports[memory: "memory"] else { return 0 }
         let bytes = Array(memory.data[ptr..<(ptr + len)])
 
+        // Decode FetchRequest from JSON (SDK sends JSON for host functions)
         let request: FetchRequestWire
         do {
-            request = try MessagePackDecoder().decode(FetchRequestWire.self, from: Data(bytes))
+            request = try jsonDecoder.decode(FetchRequestWire.self, from: Data(bytes))
+            print("[atlas-host] fetch: \(request.method) \(request.url)")
         } catch {
-            return writeError(caller: caller, message: "decode FetchRequest: \(error)")
+            print("[atlas-host] decode FetchRequest FAILED: \(error)")
+            return writeJsonError(caller: caller, message: "decode FetchRequest: \(error)")
         }
 
         guard let url = URL(string: request.url) else {
-            return writeError(caller: caller, message: "invalid URL: \(request.url)")
+            return writeJsonError(caller: caller, message: "invalid URL: \(request.url)")
         }
 
         var urlRequest = URLRequest(url: url)
@@ -128,7 +147,9 @@ final class HostFunctions: @unchecked Sendable {
         for (key, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
-        urlRequest.httpBody = request.body
+        if let body = request.body {
+            urlRequest.httpBody = Data(body)
+        }
         urlRequest.timeoutInterval = 30
 
         // Synchronous network — WASM is single-threaded
@@ -147,7 +168,7 @@ final class HostFunctions: @unchecked Sendable {
         semaphore.wait()
 
         if let error = responseError {
-            return writeError(caller: caller, message: "network: \(error.localizedDescription)")
+            return writeJsonError(caller: caller, message: "network: \(error.localizedDescription)")
         }
 
         let status = UInt16(responseHTTP?.statusCode ?? 0)
@@ -156,12 +177,14 @@ final class HostFunctions: @unchecked Sendable {
             headers[String(describing: key).lowercased()] = String(describing: value)
         }
 
+        print("[atlas-host] fetch response: HTTP \(status), \(responseData?.count ?? 0) bytes")
+
         let response = FetchResponseWire(
             status: status,
             headers: headers,
-            body: responseData ?? Data()
+            body: Array(responseData ?? Data())
         )
-        return writeOk(caller: caller, value: response)
+        return writeJsonOk(caller: caller, value: response)
     }
 
     // MARK: - Log
@@ -182,52 +205,11 @@ final class HostFunctions: @unchecked Sendable {
 
     private func hostCacheGet(caller: Caller, args: [Value]) -> UInt64 {
         guard (try? policy.require("cache.read")) != nil else { return 0 }
-        let ptr = Int(args[0].i32)
-        let len = Int(args[1].i32)
-        guard let memory = caller.instance?.exports[memory: "memory"] else {
-            return writeOkNil(caller: caller)
-        }
-        let keyBytes = Array(memory.data[ptr..<(ptr + len)])
-
-        guard let key = try? MessagePackDecoder().decode(String.self, from: Data(keyBytes)) else {
-            return writeOkNil(caller: caller)
-        }
-
-        if let entry = cache[key] {
-            if let expiry = entry.expiry, Date() > expiry {
-                cache.removeValue(forKey: key)
-                return writeOkNil(caller: caller)
-            }
-            let value: [UInt8]? = Array(entry.data)
-            return writeOk(caller: caller, value: value)
-        }
-
-        return writeOkNil(caller: caller)
-    }
-
-    private struct CacheEntryWire: Decodable {
-        let key: String
-        let value: Data
-        let ttlSeconds: UInt32?
-        enum CodingKeys: String, CodingKey {
-            case key, value
-            case ttlSeconds = "ttl_seconds"
-        }
+        return writeJsonNil(caller: caller)
     }
 
     private func hostCacheSet(caller: Caller, args: [Value]) -> UInt32 {
         guard (try? policy.require("cache.write")) != nil else { return 1 }
-        let ptr = Int(args[0].i32)
-        let len = Int(args[1].i32)
-        guard let memory = caller.instance?.exports[memory: "memory"] else { return 1 }
-        let bytes = Array(memory.data[ptr..<(ptr + len)])
-
-        guard let entry = try? MessagePackDecoder().decode(CacheEntryWire.self, from: Data(bytes)) else {
-            return 1
-        }
-
-        let expiry: Date? = entry.ttlSeconds.map { Date().addingTimeInterval(Double($0)) }
-        cache[entry.key] = (data: entry.value, expiry: expiry)
         return 0
     }
 
@@ -235,25 +217,33 @@ final class HostFunctions: @unchecked Sendable {
 
     private func hostPreferencesGet(caller: Caller, args: [Value]) -> UInt64 {
         guard (try? policy.require("preferences.read")) != nil else { return 0 }
-        return writeOkNil(caller: caller)
+        return writeJsonNil(caller: caller)
     }
 
-    // MARK: - Memory helpers
+    // MARK: - JSON response helpers
 
-    private func writeOk<T: Encodable>(caller: Caller, value: T) -> UInt64 {
-        guard let data = try? MessagePackBridge.encodeOk(value) else { return 0 }
+    private func writeJsonOk<T: Encodable>(caller: Caller, value: T) -> UInt64 {
+        let envelope = OkEnvelope(status: "ok", data: value)
+        guard let data = try? jsonEncoder.encode(envelope) else { return 0 }
         return writeToGuestMemory(caller: caller, data: data)
     }
 
-    private func writeOkNil(caller: Caller) -> UInt64 {
-        guard let data = try? MessagePackBridge.encodeOkNil() else { return 0 }
+    private func writeJsonError(caller: Caller, message: String) -> UInt64 {
+        let envelope = ErrEnvelope(
+            status: "err",
+            data: ErrData(RuntimeFailure: MessageField(message: message))
+        )
+        guard let data = try? jsonEncoder.encode(envelope) else { return 0 }
         return writeToGuestMemory(caller: caller, data: data)
     }
 
-    private func writeError(caller: Caller, message: String) -> UInt64 {
-        guard let data = try? MessagePackBridge.encodeError(message: message) else { return 0 }
+    private func writeJsonNil(caller: Caller) -> UInt64 {
+        let envelope = NilEnvelope(status: "ok", data: nil)
+        guard let data = try? jsonEncoder.encode(envelope) else { return 0 }
         return writeToGuestMemory(caller: caller, data: data)
     }
+
+    // MARK: - Guest memory
 
     private func writeToGuestMemory(caller: Caller, data: Data) -> UInt64 {
         let len = UInt32(data.count)
@@ -265,10 +255,9 @@ final class HostFunctions: @unchecked Sendable {
 
         guard let memory = caller.instance?.exports[memory: "memory"] else { return 0 }
         let bytes = Array(data)
-        // Write bytes to guest memory using withUnsafeMutableBufferPointer
         memory.withUnsafeMutableBufferPointer(offset: UInt(ptr), count: Int(len)) { buffer in
-            for i in 0..<Int(len) {
-                buffer[i] = bytes[i]
+            for idx in 0..<Int(len) {
+                buffer[idx] = bytes[idx]
             }
         }
 

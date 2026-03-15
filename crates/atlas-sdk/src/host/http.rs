@@ -11,7 +11,9 @@ use crate::abi::codec::decode_host_result;
 /// The host enforces domain allowlists, rate limits, and timeout rules
 /// before forwarding the request. Capability `network.fetch` must be declared.
 pub fn fetch(request: FetchRequest) -> Result<FetchResponse, SourceError> {
-    let bytes = rmp_serde::to_vec_named(&request).map_err(|e| SourceError::RuntimeFailure {
+    // Host functions use JSON wire format for cross-language compatibility
+    // (Swift ↔ Rust). Export functions use MessagePack (Rust ↔ Rust).
+    let bytes = serde_json::to_vec(&request).map_err(|e| SourceError::RuntimeFailure {
         message: format!("failed to encode FetchRequest: {e}"),
     })?;
 

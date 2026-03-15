@@ -47,14 +47,16 @@ fn register_network_fetch(linker: &mut Linker<HostState>) -> Result<(), RuntimeE
                     Err(e) => return write_error(&mut caller, e.to_string()),
                 };
 
-                let request: FetchRequest = match rmp_serde::from_slice(&input) {
+                // SDK sends JSON for host function requests (cross-language compat)
+                let request: FetchRequest = match serde_json::from_slice(&input) {
                     Ok(r) => r,
                     Err(e) => return write_error(&mut caller, format!("decode FetchRequest: {e}")),
                 };
 
                 let network = Arc::clone(&caller.data().network);
                 match network.fetch(request) {
-                    Ok(response) => write_ok(&mut caller, &response),
+                    // Host functions respond in JSON format
+                    Ok(response) => write_ok_json(&mut caller, &response),
                     Err(e) => write_error(&mut caller, e.to_string()),
                 }
             })
@@ -198,12 +200,23 @@ fn read_from_guest(caller: &Caller<HostState>, ptr: u32, len: u32) -> Result<Vec
 }
 
 /// Encode `Ok(value)` as MessagePack and write it into guest memory.
-/// Returns the packed `(ptr, len)` i64.
+/// Used for non-network host functions (cache, preferences).
 fn write_ok<T: serde::Serialize>(caller: &mut Caller<HostState>, value: &T) -> i64 {
     let envelope = AtlasResultWire::ok(value.to_owned());
     let bytes = match rmp_serde::to_vec_named(&envelope) {
         Ok(b) => b,
         Err(e) => return write_error(caller, format!("encode response: {e}")),
+    };
+    write_to_guest(caller, bytes)
+}
+
+/// Encode `Ok(value)` as JSON and write it into guest memory.
+/// Used for network host function (cross-language compatibility).
+fn write_ok_json<T: serde::Serialize>(caller: &mut Caller<HostState>, value: &T) -> i64 {
+    let envelope = AtlasResultWire::ok(value.to_owned());
+    let bytes = match serde_json::to_vec(&envelope) {
+        Ok(b) => b,
+        Err(e) => return write_error_json(caller, format!("encode response: {e}")),
     };
     write_to_guest(caller, bytes)
 }
@@ -214,6 +227,15 @@ fn write_error(caller: &mut Caller<HostState>, msg: String) -> i64 {
     let envelope = AtlasResultWire::<()>::err(SourceError::RuntimeFailure { message: msg });
     let bytes = rmp_serde::to_vec_named(&envelope)
         .unwrap_or_else(|_| b"\x81\xa6status\xa3err".to_vec());
+    write_to_guest(caller, bytes)
+}
+
+/// Encode an error as JSON and write it into guest memory.
+fn write_error_json(caller: &mut Caller<HostState>, msg: String) -> i64 {
+    use atlas_spec::SourceError;
+    let envelope = AtlasResultWire::<()>::err(SourceError::RuntimeFailure { message: msg });
+    let bytes = serde_json::to_vec(&envelope)
+        .unwrap_or_else(|_| br#"{"status":"err","data":{"RuntimeFailure":{"message":"encode error"}}}"#.to_vec());
     write_to_guest(caller, bytes)
 }
 

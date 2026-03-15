@@ -83,16 +83,19 @@ public struct SourceBrowseView: View {
         let source = sourceInstance
         Task.detached {
             do {
+                print("[atlas-ui] Loading \(tab == 0 ? "popular" : "latest")...")
                 let response = tab == 0
                     ? try source.getPopular()
                     : try source.getLatest()
+                print("[atlas-ui] Got \(response.entries.count) entries")
                 await MainActor.run {
                     results = response.entries
                     isLoading = false
                 }
             } catch {
+                print("[atlas-ui] Load error: \(error)")
                 await MainActor.run {
-                    self.error = error.localizedDescription
+                    self.error = "\(error)"
                     isLoading = false
                 }
             }

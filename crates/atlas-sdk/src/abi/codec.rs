@@ -91,7 +91,8 @@ pub unsafe fn decode_host_result<T: for<'de> Deserialize<'de>>(
     }
 
     let slice = core::slice::from_raw_parts(ptr, len as usize);
-    let result: AtlasResult<T> = rmp_serde::from_slice(slice).map_err(|e| {
+    // Host functions use JSON wire format for cross-language compatibility.
+    let result: AtlasResult<T> = serde_json::from_slice(slice).map_err(|e| {
         SourceError::RuntimeFailure {
             message: format!("failed to decode host result: {e}"),
         }
