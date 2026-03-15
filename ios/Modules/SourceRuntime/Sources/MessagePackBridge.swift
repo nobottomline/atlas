@@ -12,7 +12,6 @@ enum MessagePackBridge {
 
     // MARK: - Encode (Swift → WASM)
 
-    /// Encode a Swift `Encodable` value to JSON bytes.
     static func encode<T: Encodable>(_ value: T) throws -> Data {
         try jsonEncoder.encode(value)
     }
@@ -20,18 +19,13 @@ enum MessagePackBridge {
     // MARK: - Decode (WASM → Swift)
 
     /// Decode a JSON-encoded `AtlasResultWire<T>` response.
-    ///
-    /// Rust wire format (adjacently tagged enum):
-    /// `{"status": "ok", "data": T}` or `{"status": "err", "data": SourceError}`
     static func decodeResult<T: Decodable>(_ data: Data) throws -> T {
         let envelope: ResultEnvelope<T>
         do {
             envelope = try jsonDecoder.decode(ResultEnvelope<T>.self, from: data)
         } catch {
             let preview = String(data: data.prefix(300), encoding: .utf8) ?? "<binary>"
-            print("[atlas-bridge] Decode failed (\(data.count)B): \(error)")
-            print("[atlas-bridge] JSON preview: \(preview)")
-            throw SourceRuntimeError.sourceError("decode failed: \(error.localizedDescription)")
+            throw SourceRuntimeError.sourceError("decode: \(error.localizedDescription) | \(preview)")
         }
 
         switch envelope.status {
@@ -41,14 +35,14 @@ enum MessagePackBridge {
             }
             return value
         case "err":
-            let msg = envelope.errorMessage ?? "source returned an error"
-            throw SourceRuntimeError.sourceError(msg)
+            let extracted = envelope.errorMessage ?? "unknown error"
+            throw SourceRuntimeError.sourceError(extracted)
         default:
             throw SourceRuntimeError.sourceError("unexpected status: \(envelope.status)")
         }
     }
 
-    // MARK: - Decode helpers
+    // MARK: - Wire types
 
     private struct ResultEnvelope<T: Decodable>: Decodable {
         let status: String
@@ -71,21 +65,31 @@ enum MessagePackBridge {
             }
         }
 
-        /// Extract message from Rust SourceError variants.
-        /// Externally tagged: {"VariantName": {"message": "..."}}
+        /// Rust SourceError: #[serde(tag = "kind", content = "detail", rename_all = "snake_case")]
+        /// Format: {"kind": "runtime_failure", "detail": {"message": "..."}}
         private static func extractErrorMessage(
             from container: KeyedDecodingContainer<CodingKeys>
         ) -> String? {
-            if let map = try? container.decode([String: [String: String]].self, forKey: .data) {
-                for (variant, fields) in map {
-                    if let msg = fields["message"] { return "\(variant): \(msg)" }
-                    return variant
+            // Adjacently tagged with kind/detail
+            if let err = try? container.decode(SourceErrorJSON.self, forKey: .data) {
+                let kind = err.kind
+                if let detail = err.detail {
+                    if let msg = detail["message"] { return "\(kind): \(msg)" }
+                    if let cap = detail["capability"] { return "\(kind): \(cap)" }
                 }
+                return kind
             }
+            // Unit variants without detail (e.g. "not_found")
             if let str = try? container.decode(String.self, forKey: .data) {
                 return str
             }
             return nil
         }
+    }
+
+    /// Matches Rust SourceError serde format
+    private struct SourceErrorJSON: Decodable {
+        let kind: String
+        let detail: [String: String]?
     }
 }

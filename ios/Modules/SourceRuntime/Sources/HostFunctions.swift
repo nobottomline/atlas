@@ -101,15 +101,13 @@ final class HostFunctions: @unchecked Sendable {
 
     private struct ErrEnvelope: Encodable {
         let status: String
-        let data: ErrData
+        let data: SourceErrorWire
     }
 
-    private struct ErrData: Encodable {
-        let RuntimeFailure: MessageField // swiftlint:disable:this identifier_name
-    }
-
-    private struct MessageField: Encodable {
-        let message: String
+    /// Matches Rust: #[serde(tag = "kind", content = "detail", rename_all = "snake_case")]
+    private struct SourceErrorWire: Encodable {
+        let kind: String
+        let detail: [String: String]
     }
 
     private struct NilEnvelope: Encodable {
@@ -231,7 +229,7 @@ final class HostFunctions: @unchecked Sendable {
     private func writeJsonError(caller: Caller, message: String) -> UInt64 {
         let envelope = ErrEnvelope(
             status: "err",
-            data: ErrData(RuntimeFailure: MessageField(message: message))
+            data: SourceErrorWire(kind: "runtime_failure", detail: ["message": message])
         )
         guard let data = try? jsonEncoder.encode(envelope) else { return 0 }
         return writeToGuestMemory(caller: caller, data: data)

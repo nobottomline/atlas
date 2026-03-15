@@ -235,7 +235,7 @@ fn write_error_json(caller: &mut Caller<HostState>, msg: String) -> i64 {
     use atlas_spec::SourceError;
     let envelope = AtlasResultWire::<()>::err(SourceError::RuntimeFailure { message: msg });
     let bytes = serde_json::to_vec(&envelope)
-        .unwrap_or_else(|_| br#"{"status":"err","data":{"RuntimeFailure":{"message":"encode error"}}}"#.to_vec());
+        .unwrap_or_else(|_| br#"{"status":"err","data":{"kind":"runtime_failure","detail":{"message":"encode error"}}}"#.to_vec());
     write_to_guest(caller, bytes)
 }
 
