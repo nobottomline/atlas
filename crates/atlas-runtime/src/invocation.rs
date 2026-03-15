@@ -78,7 +78,7 @@ where
     T: for<'de> Deserialize<'de>,
 {
     // 1. Encode the argument.
-    let arg_bytes = rmp_serde::to_vec_named(arg)
+    let arg_bytes = serde_json::to_vec(arg)
         .map_err(|e| RuntimeError::codec(format!("encode arg: {e}")))?;
 
     // 2. Allocate guest-side buffer.
@@ -146,7 +146,7 @@ where
     guest_dealloc(&mut *store, instance, ptr, len);
 
     // Decode the envelope.
-    let envelope: AtlasResultWire<T> = rmp_serde::from_slice(&result_bytes)
+    let envelope: AtlasResultWire<T> = serde_json::from_slice(&result_bytes)
         .map_err(|e| RuntimeError::codec(format!("decode result: {e}")))?;
 
     match envelope {

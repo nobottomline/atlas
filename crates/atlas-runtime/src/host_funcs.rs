@@ -114,7 +114,7 @@ fn register_cache_get(linker: &mut Linker<HostState>) -> Result<(), RuntimeError
                     Ok(b) => b,
                     Err(e) => return write_error(&mut caller, e.to_string()),
                 };
-                let key: String = match rmp_serde::from_slice(&key_bytes) {
+                let key: String = match serde_json::from_slice(&key_bytes) {
                     Ok(k) => k,
                     Err(e) => return write_error(&mut caller, format!("decode cache key: {e}")),
                 };
@@ -151,7 +151,7 @@ fn register_cache_set(linker: &mut Linker<HostState>) -> Result<(), RuntimeError
                     Ok(b) => b,
                     Err(_) => return 1,
                 };
-                let entry: CacheEntry = match rmp_serde::from_slice(&bytes) {
+                let entry: CacheEntry = match serde_json::from_slice(&bytes) {
                     Ok(e) => e,
                     Err(_) => return 1,
                 };
@@ -203,7 +203,7 @@ fn read_from_guest(caller: &Caller<HostState>, ptr: u32, len: u32) -> Result<Vec
 /// Used for non-network host functions (cache, preferences).
 fn write_ok<T: serde::Serialize>(caller: &mut Caller<HostState>, value: &T) -> i64 {
     let envelope = AtlasResultWire::ok(value.to_owned());
-    let bytes = match rmp_serde::to_vec_named(&envelope) {
+    let bytes = match serde_json::to_vec(&envelope) {
         Ok(b) => b,
         Err(e) => return write_error(caller, format!("encode response: {e}")),
     };
@@ -225,7 +225,7 @@ fn write_ok_json<T: serde::Serialize>(caller: &mut Caller<HostState>, value: &T)
 fn write_error(caller: &mut Caller<HostState>, msg: String) -> i64 {
     use atlas_spec::SourceError;
     let envelope = AtlasResultWire::<()>::err(SourceError::RuntimeFailure { message: msg });
-    let bytes = rmp_serde::to_vec_named(&envelope)
+    let bytes = serde_json::to_vec(&envelope)
         .unwrap_or_else(|_| b"\x81\xa6status\xa3err".to_vec());
     write_to_guest(caller, bytes)
 }
