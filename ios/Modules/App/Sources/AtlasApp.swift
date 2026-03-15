@@ -8,16 +8,16 @@ import SourceRuntime
 import SourceRegistry
 import Core
 
+let defaultRegistryURL = "https://raw.githubusercontent.com/nobottomline/atlas/main/registry"
+
 @main
 struct AtlasApp: App {
 
     @State private var sourceManager: SourceManager
 
     init() {
-        let registryURL = URL(string:
-            UserDefaults.standard.string(forKey: "registryURL")
-            ?? "https://raw.githubusercontent.com/atlas-platform/atlas-registry/main"
-        )!
+        let urlString = UserDefaults.standard.string(forKey: "registryURL") ?? defaultRegistryURL
+        let registryURL = URL(string: urlString) ?? URL(string: defaultRegistryURL)!
 
         let manager = SourceManager(
             runtime: AtlasRuntime(),

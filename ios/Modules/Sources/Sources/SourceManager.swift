@@ -25,6 +25,7 @@ public final class SourceManager: @unchecked Sendable {
     public private(set) var registryEntries: [RegistryEntry] = []
     public private(set) var installedSources: [InstalledSource] = []
     public private(set) var isLoadingRegistry = false
+    public private(set) var isInstalling: String?
     public private(set) var error: String?
 
     // MARK: - Dependencies
@@ -32,7 +33,9 @@ public final class SourceManager: @unchecked Sendable {
     private let runtime: AtlasRuntime
     private let registryClient: RegistryClient
     private let storage: SourceStorageProtocol
-    private let registryBaseURL: URL
+
+    /// Base URL of the registry (e.g. raw.githubusercontent.com/user/repo/main/registry)
+    public var registryBaseURL: URL
 
     public init(
         runtime: AtlasRuntime = AtlasRuntime(),
@@ -48,7 +51,6 @@ public final class SourceManager: @unchecked Sendable {
 
     // MARK: - Registry
 
-    /// Fetch the registry index and update available sources.
     public func refreshRegistry() async {
         isLoadingRegistry = true
         error = nil
@@ -62,7 +64,6 @@ public final class SourceManager: @unchecked Sendable {
         isLoadingRegistry = false
     }
 
-    /// Check the state of a source.
     public func state(for entry: RegistryEntry) -> SourceState {
         if let installed = installedSources.first(where: { $0.id == entry.id }) {
             if installed.manifest.version != entry.latestVersion {
@@ -75,15 +76,17 @@ public final class SourceManager: @unchecked Sendable {
 
     // MARK: - Install / Update
 
-    /// Install a source from the registry.
     public func install(entry: RegistryEntry) async throws {
+        isInstalling = entry.id
+        defer { isInstalling = nil }
+
         // 1. Fetch manifest
         let manifestURL = registryBaseURL.appendingPathComponent(entry.manifestURL)
         let manifest = try await registryClient.fetchManifest(from: manifestURL)
 
-        // 2. Download WASM module
+        // 2. Download WASM module — path: sources/{id}/{version}/{filename}
         let wasmURL = registryBaseURL
-            .appendingPathComponent("sources/\(entry.id)/0.1.0")
+            .appendingPathComponent("sources/\(entry.id)/\(manifest.version)")
             .appendingPathComponent(manifest.moduleFilename)
         let wasm = try await registryClient.downloadModule(from: wasmURL)
 
@@ -93,10 +96,10 @@ public final class SourceManager: @unchecked Sendable {
         // 4. Load into runtime
         let instance = try runtime.loadSource(wasm: wasm, manifest: manifest)
         let source = InstalledSource(id: manifest.id, manifest: manifest, instance: instance)
+        installedSources.removeAll { $0.id == manifest.id }
         installedSources.append(source)
     }
 
-    /// Remove an installed source.
     public func remove(sourceId: String) async throws {
         try await storage.remove(sourceId: sourceId)
         installedSources.removeAll { $0.id == sourceId }
@@ -104,23 +107,22 @@ public final class SourceManager: @unchecked Sendable {
 
     // MARK: - Load from disk
 
-    /// Load all previously installed sources from disk.
     public func loadInstalledSources() async {
         do {
             let ids = try await storage.installedSourceIDs()
-            for id in ids {
+            for sourceId in ids {
                 do {
-                    let manifest = try await storage.loadManifest(sourceId: id)
+                    let manifest = try await storage.loadManifest(sourceId: sourceId)
                     let wasm = try await storage.loadWASM(
-                        sourceId: id,
+                        sourceId: sourceId,
                         filename: manifest.moduleFilename
                     )
                     let instance = try runtime.loadSource(wasm: wasm, manifest: manifest)
                     installedSources.append(
-                        InstalledSource(id: id, manifest: manifest, instance: instance)
+                        InstalledSource(id: sourceId, manifest: manifest, instance: instance)
                     )
                 } catch {
-                    print("[atlas] Failed to load source \(id): \(error)")
+                    print("[atlas] Failed to load source \(sourceId): \(error)")
                 }
             }
         } catch {
@@ -128,7 +130,6 @@ public final class SourceManager: @unchecked Sendable {
         }
     }
 
-    /// Get an installed source instance by ID.
     public func source(id: String) -> SourceInstance? {
         installedSources.first(where: { $0.id == id })?.instance
     }
